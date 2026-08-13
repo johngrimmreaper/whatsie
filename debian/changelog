@@ -1,0 +1,10 @@
+whatsie (5.1.0-1~ppa1~noble1) noble; urgency=medium
+
+  * Package Whatsie 5.1.0 for Ubuntu 24.04 LTS.
+  * Build against Ubuntu's native Qt 6.4.2 stack.
+  * Add Qt 6.4 compatibility for WebEngine permissions.
+  * Add Qt 6.4 compatibility for identicon integer types.
+  * Make bundled libnotify-qt compatible with CMake 3.28 and Qt 6.4.
+  * Vendor bundled libnotify-qt source for reproducible PPA builds.
+
+ -- Reaper <JohnGrimmReaper@disroot.org>  Thu, 13 Aug 2026 21:40:43 +0000

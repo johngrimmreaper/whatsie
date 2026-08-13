@@ -1,0 +1,24 @@
+Description: Support Qt 6.4 through 6.8 in bundled libnotify-qt QHash usage
+ QHash::insertOrAssign() is unavailable in Ubuntu 24.04's Qt 6.4.
+ Use QHash::insert(), which provides the required replacement semantics,
+ for Qt 6.0 through 6.8 while retaining the upstream implementation on
+ Qt 6.9 and later.
+Author: Reaper <JohnGrimmReaper@disroot.org>
+Forwarded: not-needed
+Last-Update: 2026-08-13
+
+Index: whatsie/src/libnotify-qt/src/Manager.cpp
+===================================================================
+--- whatsie.orig/src/libnotify-qt/src/Manager.cpp
++++ whatsie/src/libnotify-qt/src/Manager.cpp
+@@ -62,6 +62,10 @@ void Manager::addNotification(EventPtr n
+ 		ntf->emitClosed(ClosingReason::BUSCALL);
+ 	}
+ 	ids.insert(id, notif);
++#elif QT_VERSION < QT_VERSION_CHECK(6, 9, 0)
++	// QHash::insertOrAssign() was introduced in Qt 6.9.
++	// insert() has the same replacement semantics needed here.
++	ids.insert(id, notif);
+ #else
+ 	ids.insertOrAssign(id, notif);
+ #endif

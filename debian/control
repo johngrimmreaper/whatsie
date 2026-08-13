@@ -1,0 +1,28 @@
+Source: whatsie
+Section: net
+Priority: optional
+Maintainer: Reaper <JohnGrimmReaper@disroot.org>
+Build-Depends:
+ debhelper-compat (= 13),
+ cmake (>= 3.28),
+ ninja-build,
+ qt6-base-dev (>= 6.4.2),
+ qt6-webengine-dev (>= 6.4.2),
+ qt6-positioning-dev (>= 6.4.2),
+ libx11-dev
+Standards-Version: 4.7.4
+Rules-Requires-Root: no
+Homepage: https://github.com/keshavbhatt/whatsie
+Vcs-Git: https://github.com/johngrimmreaper/whatsie.git -b ubuntu/24.04-noble
+Vcs-Browser: https://github.com/johngrimmreaper/whatsie/tree/ubuntu/24.04-noble
+
+Package: whatsie
+Architecture: amd64 arm64 armhf
+Depends:
+ ${shlibs:Depends},
+ ${misc:Depends}
+Description: feature-rich WhatsApp Web client for Linux
+ Whatsie is a desktop client for WhatsApp Web built with Qt and Qt
+ WebEngine. It provides desktop integration including notifications,
+ downloads, themes, privacy controls, application locking, and system
+ tray support.

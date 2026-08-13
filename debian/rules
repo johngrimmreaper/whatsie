@@ -1,0 +1,10 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --buildsystem=cmake+ninja
+
+override_dh_auto_test:
+	@echo "No upstream test suite; skipping dh_auto_test"
+
+execute_after_dh_auto_install:
+	rm -rf debian/whatsie/usr/share/licenses
