@@ -6,3 +6,6 @@
 /*.substvars
 /whatsie/
 /whatsie-dbgsym/
+
+# Upstream ignores "*build-*"; Debian patch names may legitimately contain it.
+!/patches/*.patch
