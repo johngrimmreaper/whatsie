@@ -4,17 +4,17 @@ Priority: optional
 Maintainer: Reaper <JohnGrimmReaper@disroot.org>
 Build-Depends:
  debhelper-compat (= 13),
- cmake (>= 3.28),
+ cmake (>= 4.0),
  ninja-build,
- qt6-base-dev (>= 6.4.2),
- qt6-webengine-dev (>= 6.4.2),
- qt6-positioning-dev (>= 6.4.2),
+ qt6-base-dev (>= 6.10.0),
+ qt6-webengine-dev (>= 6.10.0),
+ qt6-positioning-dev (>= 6.10.0),
  libx11-dev
 Standards-Version: 4.7.4
 Rules-Requires-Root: no
 Homepage: https://github.com/keshavbhatt/whatsie
-Vcs-Git: https://github.com/johngrimmreaper/whatsie.git -b ubuntu/24.04-noble
-Vcs-Browser: https://github.com/johngrimmreaper/whatsie/tree/ubuntu/24.04-noble
+Vcs-Git: https://github.com/johngrimmreaper/whatsie.git -b ubuntu/26.04-resolute
+Vcs-Browser: https://github.com/johngrimmreaper/whatsie/tree/ubuntu/26.04-resolute
 
 Package: whatsie
 Architecture: amd64 arm64 armhf

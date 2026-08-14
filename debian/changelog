@@ -1,3 +1,14 @@
+whatsie (5.1.0-1~ppa1~resolute1) resolute; urgency=medium
+
+  * Package Whatsie 5.1.0 for Ubuntu 26.04 LTS.
+  * Build against Ubuntu's native Qt 6.10 stack.
+  * Use upstream Qt 6.10 WebEngine permission implementation without
+    Noble compatibility patches.
+  * Build bundled libnotify-qt against the native CMake 4 stack.
+  * Vendor bundled libnotify-qt source for reproducible PPA builds.
+
+ -- Reaper <JohnGrimmReaper@disroot.org>  Fri, 14 Aug 2026 12:33:00 +0000
+
 whatsie (5.1.0-1~ppa1~noble1) noble; urgency=medium
 
   * Package Whatsie 5.1.0 for Ubuntu 24.04 LTS.
