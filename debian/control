@@ -13,8 +13,8 @@ Build-Depends:
 Standards-Version: 4.7.4
 Rules-Requires-Root: no
 Homepage: https://github.com/keshavbhatt/whatsie
-Vcs-Git: https://github.com/johngrimmreaper/whatsie.git -b ubuntu/26.04-resolute
-Vcs-Browser: https://github.com/johngrimmreaper/whatsie/tree/ubuntu/26.04-resolute
+Vcs-Git: https://github.com/johngrimmreaper/whatsie.git -b ubuntu/26.10-stonking
+Vcs-Browser: https://github.com/johngrimmreaper/whatsie/tree/ubuntu/26.10-stonking
 
 Package: whatsie
 Architecture: amd64 arm64 armhf
