@@ -1,3 +1,12 @@
+whatsie (6.1.0-1~ppa1~resolute1) resolute; urgency=medium
+
+  * Package Whatsie 6.1.0 for Ubuntu 26.04 LTS.
+  * Build against Ubuntu's native Qt 6.10.2 stack.
+  * Lower the upstream Linux Qt build floor from 6.11 to 6.10 for Resolute.
+  * Adopt the upstream 6.x Debian dependency model and application rewrite.
+
+ -- Reaper <JohnGrimmReaper@disroot.org>  Sat, 19 Sep 2026 03:03:00 +0000
+
 whatsie (6.1.0) unstable; urgency=medium
 
   * Interface translations: German, Spanish, French, Italian, Portuguese
@@ -13,7 +22,7 @@ whatsie (6.1.0) unstable; urgency=medium
 whatsie (6.0.4) unstable; urgency=medium
 
   * Spell check: fix dictionaries silently failing to load; allow adding
-    languages from Settings → Advanced → Spell check.
+    languages from Settings → Advanced.
   * NVIDIA/Wayland: fall back to software rendering instead of a black screen.
 
  -- Keshav Bhatt <keshavnrj@gmail.com>  Mon, 07 Sep 2026 12:00:00 +0530
@@ -33,3 +42,25 @@ whatsie (6.0.1) unstable; urgency=medium
   * Fixes device linking (phone number and QR code).
 
  -- Keshav Bhatt <keshavnrj@gmail.com>  Fri, 04 Sep 2026 18:57:00 +0530
+
+whatsie (5.1.0-1~ppa1~resolute1) resolute; urgency=medium
+
+  * Package Whatsie 5.1.0 for Ubuntu 26.04 LTS.
+  * Build against Ubuntu's native Qt 6.10 stack.
+  * Use upstream Qt 6.10 WebEngine permission implementation without
+    Noble compatibility patches.
+  * Build bundled libnotify-qt against the native CMake 4 stack.
+  * Vendor bundled libnotify-qt source for reproducible PPA builds.
+
+ -- Reaper <JohnGrimmReaper@disroot.org>  Fri, 14 Aug 2026 12:33:00 +0000
+
+whatsie (5.1.0-1~ppa1~noble1) noble; urgency=medium
+
+  * Package Whatsie 5.1.0 for Ubuntu 24.04 LTS.
+  * Build against Ubuntu's native Qt 6.4.2 stack.
+  * Add Qt 6.4 compatibility for WebEngine permissions.
+  * Add Qt 6.4 compatibility for identicon integer types.
+  * Make bundled libnotify-qt compatible with CMake 3.28 and Qt 6.4.
+  * Vendor bundled libnotify-qt source for reproducible PPA builds.
+
+ -- Reaper <JohnGrimmReaper@disroot.org>  Thu, 13 Aug 2026 21:40:43 +0000

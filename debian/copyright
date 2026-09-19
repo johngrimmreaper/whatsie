@@ -7,6 +7,10 @@ Files: *
 Copyright: 2021 Keshav Bhatt <keshavnrj@gmail.com>
 License: Expat
 
+Files: debian/*
+Copyright: 2026 Reaper <JohnGrimmReaper@disroot.org>
+License: Expat
+
 License: Expat
  Permission is hereby granted, free of charge, to any person obtaining a
  copy of this software and associated documentation files (the "Software"),

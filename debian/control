@@ -1,23 +1,23 @@
 Source: whatsie
 Section: net
 Priority: optional
-Maintainer: Keshav Bhatt <keshavnrj@gmail.com>
+Maintainer: Reaper <JohnGrimmReaper@disroot.org>
 Build-Depends:
  debhelper-compat (= 13),
  cmake,
- qt6-base-dev (>= 6.11),
+ qt6-base-dev (>= 6.10.2),
  qt6-declarative-dev,
  qt6-svg-dev,
  qt6-webchannel-dev,
- qt6-webengine-dev (>= 6.11)
-Standards-Version: 4.7.0
+ qt6-webengine-dev (>= 6.10.2)
+Standards-Version: 4.7.4
 Homepage: https://github.com/keshavbhatt/whatsie
-Vcs-Git: https://github.com/keshavbhatt/whatsie.git
-Vcs-Browser: https://github.com/keshavbhatt/whatsie
+Vcs-Git: https://github.com/johngrimmreaper/whatsie.git -b ubuntu/26.04-resolute
+Vcs-Browser: https://github.com/johngrimmreaper/whatsie/tree/ubuntu/26.04-resolute
 Rules-Requires-Root: no
 
 Package: whatsie
-Architecture: any
+Architecture: amd64 arm64 armhf
 Depends:
  ${shlibs:Depends},
  ${misc:Depends}
