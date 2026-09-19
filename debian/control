@@ -12,8 +12,8 @@ Build-Depends:
  qt6-webengine-dev (>= 6.10.2)
 Standards-Version: 4.7.4
 Homepage: https://github.com/keshavbhatt/whatsie
-Vcs-Git: https://github.com/johngrimmreaper/whatsie.git -b ubuntu/26.04-resolute
-Vcs-Browser: https://github.com/johngrimmreaper/whatsie/tree/ubuntu/26.04-resolute
+Vcs-Git: https://github.com/johngrimmreaper/whatsie.git
+Vcs-Browser: https://github.com/johngrimmreaper/whatsie
 Rules-Requires-Root: no
 
 Package: whatsie

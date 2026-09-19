@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 # Build Whatsie with debhelper's CMake buildsystem.
-# Ubuntu 26.04 ships Qt 6.10.2; upstream Linux packaging defaults to Qt 6.11.
+# Ubuntu packaging targets Qt 6.10 or newer; upstream Linux packaging defaults to Qt 6.11.
 
 %:
 	dh $@ --buildsystem=cmake
