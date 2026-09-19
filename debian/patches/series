@@ -3,3 +3,4 @@
 0003-libnotify-qt-cmake-3.28.patch
 0004-libnotify-qt-support-qt-6.4-qhash.patch
 0005-identicons-use-qtglobal-on-qt-6.4.patch
+0006-disable-qtwebengine-gpu-acceleration.patch
