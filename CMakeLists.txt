@@ -1,280 +1,176 @@
-cmake_minimum_required(VERSION 3.24)
-project(whatsie LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.21)
 
-# Set the C++ standard
-set(CMAKE_CXX_STANDARD 17)
+project(whatsie
+    VERSION 6.1.0
+    DESCRIPTION "WhatsApp Web desktop client built with Qt WebEngine"
+    HOMEPAGE_URL "https://github.com/keshavbhatt/whatsie"
+    LANGUAGES CXX
+)
+
+# ---------------------------------------------------------------------------
+# Options
+# ---------------------------------------------------------------------------
+option(WHATSIE_BUILD_TESTS "Build unit tests" ON)
+option(WHATSIE_WERROR "Treat warnings as errors" OFF)
+option(WHATSIE_ENABLE_CLANG_TIDY "Run clang-tidy during the build" OFF)
+
+# ---------------------------------------------------------------------------
+# Global settings
+# ---------------------------------------------------------------------------
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Set version
-set(PROJECT_VERSION 5.1.0)
-set(PROJECT_DESCRIPTION "Feature rich WhatsApp web client based on Qt WebEngine")
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type" FORCE)
+endif()
 
-# Get Git information
-execute_process(
-    COMMAND git rev-parse --short HEAD
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    OUTPUT_VARIABLE GIT_HASH
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    ERROR_QUIET
-)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(Warnings)
+include(Version)
 
-execute_process(
-    COMMAND git rev-parse --abbrev-ref HEAD
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    OUTPUT_VARIABLE GIT_BRANCH
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    ERROR_QUIET
-)
-
-string(TIMESTAMP BUILD_TIMESTAMP "%Y-%m-%d %H:%M:%S")
-
-# Set Qt version - Require Qt 6.10 minimum
-set(QT_VERSION_MAJOR 6)
-set(QT_VERSION_MINOR 10)
-
-# Set CMake policies
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
-set(CMAKE_AUTOUIC ON)
-
-# Find required packages
-find_package(Qt${QT_VERSION_MAJOR} ${QT_VERSION_MAJOR}.${QT_VERSION_MINOR} REQUIRED COMPONENTS
+# ---------------------------------------------------------------------------
+# Qt version. Linux builds and runs on 6.11 — the version shipped by the
+# kde-qt6-core24-sdk snap and the Flathub KDE runtime, i.e. what every
+# distributed Linux build actually runs on (see scripts/dev-build.sh). The
+# Windows build bundles its own Qt and pins 6.10 (the newest Qt whose Windows
+# SDK layout aqtinstall can install), so its CI overrides this floor.
+# ---------------------------------------------------------------------------
+set(WHATSIE_QT_MIN_VERSION "6.11" CACHE STRING "Minimum required Qt6 version")
+find_package(Qt6 ${WHATSIE_QT_MIN_VERSION} REQUIRED COMPONENTS
     Core
     Gui
     Widgets
     WebEngineWidgets
-    Positioning
+    WebChannel
     Network
+    Concurrent
+    Svg
 )
+qt_standard_project_setup()
+include(SnapSdkWorkaround)
 
-find_package(notify-qt${QT_VERSION_MAJOR} QUIET CONFIG)
-if (notify-qt${QT_VERSION_MAJOR}_FOUND)
-    add_library(notify-qt ALIAS notify-qt${QT_VERSION_MAJOR})
-elseif (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/libnotify-qt/CMakeLists.txt")
-    add_subdirectory(src/libnotify-qt)
-else()
-    message(FATAL_ERROR
-        "notify-qt${QT_VERSION_MAJOR} package not found and the src/libnotify-qt submodule "
-        "is missing.\n"
-        "Please either install notify-qt${QT_VERSION_MAJOR} "
-        "or initialize/update the src/libnotify-qt git submodule.")
+if(MSVC)
+    # Sources are UTF-8 (string literals, comments); /bigobj for the heavy
+    # WebEngine translation units. Warning flags are set per-target in Warnings.cmake.
+    add_compile_options(/utf-8 /bigobj)
 endif()
 
-# Compiler flags
-add_compile_options(
-    -fstack-protector-strong
-    -fstack-clash-protection
-    -D_FORTIFY_SOURCE=3
-    -D_GLIBCXX_ASSERTIONS
+# Qt hygiene: forces explicit string conversions and keyword-free signal syntax.
+add_compile_definitions(
+    QT_NO_CAST_FROM_ASCII
+    QT_NO_CAST_TO_ASCII
+    QT_NO_CAST_FROM_BYTEARRAY
+    QT_NO_KEYWORDS
+    QT_NO_FOREACH
+    QT_DISABLE_DEPRECATED_UP_TO=0x061100
+    QT_USE_QSTRINGBUILDER
 )
 
-# Architecture-specific flags
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-    add_compile_options(-mbranch-protection=standard)
+if(WHATSIE_ENABLE_CLANG_TIDY)
+    find_program(CLANG_TIDY_EXE NAMES clang-tidy)
+    if(CLANG_TIDY_EXE)
+        set(CMAKE_CXX_CLANG_TIDY "${CLANG_TIDY_EXE}")
+    else()
+        message(WARNING "clang-tidy requested but not found")
+    endif()
 endif()
 
-# Release and Debug specific flags
-add_compile_options($<$<CONFIG:Release>:-O2>)
-add_compile_options($<$<CONFIG:Release>:-DQT_NO_DEBUG_OUTPUT>)
-add_compile_options($<$<CONFIG:Debug>:-O1>)
+# ---------------------------------------------------------------------------
+# Sources
+# ---------------------------------------------------------------------------
+add_subdirectory(src)
 
-# Installation prefix
-if(NOT CMAKE_INSTALL_PREFIX)
-    set(CMAKE_INSTALL_PREFIX /usr)
+# ---------------------------------------------------------------------------
+# Desktop integration (Linux): .desktop, AppStream metainfo, hicolor icons.
+# ---------------------------------------------------------------------------
+if(LINUX)
+    include(GNUInstallDirs)
+    install(FILES dist/linux/com.ktechpit.whatsie.desktop
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+    install(FILES dist/linux/com.ktechpit.whatsie.metainfo.xml
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
+    install(DIRECTORY src/resources/icons/hicolor
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons)
+
+    # FEATURES L1 / ADR-017: convert hunspell dictionaries to Chromium .bdic at
+    # build time and bundle them under share/whatsie/qtwebengine_dictionaries.
+    # Best-effort: if the tool or the dictionaries are absent (e.g. this dev
+    # host), it silently produces nothing and spell check falls back to a no-op.
+    # CI (kde-neon-6) has both, so the packaged app ships real dictionaries.
+    # The tool ships in the Qt WebEngine libexec dir, which varies by distro and
+    # (in the kde-neon-6 snap SDK) lives under the SDK mount. Search broadly and,
+    # as a last resort, glob the SDK/Qt trees. All of this is logged so a failed
+    # lookup is diagnosable from the CI output.
+    file(GLOB _whatsie_convert_glob
+        /snap/*/current/usr/lib/*/qt6/libexec/qwebengine_convert_dict
+        /snap/*/current/usr/lib/qt6/libexec/qwebengine_convert_dict
+        /usr/lib/*/qt6/libexec/qwebengine_convert_dict
+        /usr/lib/qt6/libexec/qwebengine_convert_dict)
+    find_program(WHATSIE_CONVERT_DICT
+        NAMES qwebengine_convert_dict
+        HINTS ${_whatsie_convert_glob}
+        PATHS /usr/lib/qt6 /usr/lib/x86_64-linux-gnu/qt6 /usr/lib/aarch64-linux-gnu/qt6
+              /usr/lib/qt6/libexec /usr/libexec /usr/libexec/qt6
+        PATH_SUFFIXES libexec qt6/libexec)
+    set(WHATSIE_HUNSPELL_DIR "/usr/share/hunspell" CACHE PATH "hunspell .aff/.dic directory")
+    # Distro/lean builds can bundle only the dictionaries they want (issue #61),
+    # e.g. -DWHATSIE_DICTIONARIES="en-US;de-DE". Names match the .bdic; '-' and '_'
+    # are equivalent. Empty (the default) bundles every dictionary found.
+    set(WHATSIE_DICTIONARIES "" CACHE STRING
+        "Semicolon-separated spell-check dictionaries to bundle (empty = all found)")
+    string(REPLACE "_" "-" _whatsie_want "${WHATSIE_DICTIONARIES}")
+    set(_whatsie_dicts_out "${CMAKE_BINARY_DIR}/qtwebengine_dictionaries")
+    message(STATUS "whatsie: qwebengine_convert_dict = ${WHATSIE_CONVERT_DICT}")
+    if(EXISTS "${WHATSIE_HUNSPELL_DIR}")
+        file(GLOB _whatsie_hunspell_list "${WHATSIE_HUNSPELL_DIR}/*.dic")
+        message(STATUS "whatsie: hunspell dir ${WHATSIE_HUNSPELL_DIR} has "
+                       "${_whatsie_hunspell_list}")
+    else()
+        message(STATUS "whatsie: hunspell dir ${WHATSIE_HUNSPELL_DIR} does not exist")
+    endif()
+    if(WHATSIE_CONVERT_DICT AND EXISTS "${WHATSIE_HUNSPELL_DIR}")
+        file(GLOB _whatsie_affs "${WHATSIE_HUNSPELL_DIR}/*.aff")
+        file(MAKE_DIRECTORY "${_whatsie_dicts_out}")
+        set(_whatsie_built "")
+        foreach(_aff ${_whatsie_affs})
+            get_filename_component(_base "${_aff}" NAME_WE)
+            if(EXISTS "${WHATSIE_HUNSPELL_DIR}/${_base}.dic")
+                string(REPLACE "_" "-" _dictname "${_base}")
+                if(_whatsie_want AND NOT _dictname IN_LIST _whatsie_want)
+                    continue() # not among the requested dictionaries
+                endif()
+                execute_process(
+                    COMMAND "${WHATSIE_CONVERT_DICT}"
+                            "${WHATSIE_HUNSPELL_DIR}/${_base}.dic"
+                            "${_whatsie_dicts_out}/${_dictname}.bdic"
+                    RESULT_VARIABLE _rc OUTPUT_QUIET ERROR_QUIET)
+                if(_rc EQUAL 0)
+                    message(STATUS "whatsie: bundled spell-check dictionary ${_dictname}")
+                    list(APPEND _whatsie_built "${_dictname}")
+                endif()
+            endif()
+        endforeach()
+        # Point out any requested dictionary that wasn't found, so a typo or a
+        # missing hunspell package in a lean build is obvious.
+        foreach(_w ${_whatsie_want})
+            if(NOT _w IN_LIST _whatsie_built)
+                message(WARNING "whatsie: requested dictionary '${_w}' not found in ${WHATSIE_HUNSPELL_DIR}")
+            endif()
+        endforeach()
+    else()
+        message(STATUS "whatsie: spell-check dictionaries not built "
+                       "(need qwebengine_convert_dict and ${WHATSIE_HUNSPELL_DIR})")
+    endif()
+    if(EXISTS "${_whatsie_dicts_out}")
+        install(DIRECTORY "${_whatsie_dicts_out}"
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/whatsie
+            FILES_MATCHING PATTERN "*.bdic")
+    endif()
 endif()
 
-set(BINDIR ${CMAKE_INSTALL_PREFIX}/bin)
-set(DATADIR ${CMAKE_INSTALL_PREFIX}/share)
-
-# Main application source files
-set(SOURCES
-    src/about.cpp
-    src/automatictheme.cpp
-    src/common.cpp
-    src/downloadmanagerwidget.cpp
-    src/downloadwidget.cpp
-    src/lock.cpp
-    src/main.cpp
-    src/identicons.cpp
-    src/mainwindow.cpp
-    src/mainwindow_lock.cpp
-    src/mainwindow_tray.cpp
-    src/mainwindow_webengine.cpp
-    src/permissiondialog.cpp
-    src/rateapp.cpp
-    src/settingswidget.cpp
-    src/sunclock.cpp
-    src/theme.cpp
-    src/utils.cpp
-    src/webenginepage.cpp
-    src/webenginenotifproxy.cpp
-    src/webengineprofilemanager.cpp
-    src/webview.cpp
-    src/widgets/elidedlabel/elidedlabel.cpp
-    src/widgets/scrolltext/scrolltext.cpp
-    src/widgets/MoreApps/moreapps.cpp
-)
-
-set(HEADERS
-    src/about.h
-    src/autolockeventfilter.h
-    src/automatictheme.h
-    src/common.h
-    src/def.h
-    src/downloadmanagerwidget.h
-    src/downloadwidget.h
-    src/lock.h
-    src/identicons.h
-    src/mainwindow.h
-    src/notificationpopup.h
-    src/permissiondialog.h
-    src/rateapp.h
-    src/requestinterceptor.h
-    src/settingsmanager.h
-    src/settingswidget.h
-    src/sunclock.hpp
-    src/theme.h
-    src/utils.h
-    src/webenginepage.h
-    src/webengineprofilemanager.h
-    src/webview.h
-    src/webenginenotifproxy.h
-    src/widgets/elidedlabel/elidedlabel.h
-    src/widgets/scrolltext/scrolltext.h
-    src/widgets/MoreApps/moreapps.h
-)
-
-set(UI_FILES
-    src/about.ui
-    src/automatictheme.ui
-    src/certificateerrordialog.ui
-    src/downloadmanagerwidget.ui
-    src/downloadwidget.ui
-    src/lock.ui
-    src/passworddialog.ui
-    src/permissiondialog.ui
-    src/rateapp.ui
-    src/settingswidget.ui
-    src/widgets/MoreApps/moreapps.ui
-)
-
-set(RESOURCES
-    src/icons.qrc
-)
-
-# SingleApplication library
-set(SINGLEAPP_SOURCES
-    src/singleapplication/singleapplication.cpp
-    src/singleapplication/singleapplication_p.cpp
-)
-
-set(SINGLEAPP_HEADERS
-    src/singleapplication/SingleApplication
-    src/singleapplication/singleapplication.h
-    src/singleapplication/singleapplication_p.h
-)
-
-# Create the main executable
-add_executable(whatsie
-    ${SOURCES}
-    ${HEADERS}
-    ${UI_FILES}
-    ${RESOURCES}
-    ${SINGLEAPP_SOURCES}
-    ${SINGLEAPP_HEADERS}
-)
-
-# Include directories
-target_include_directories(whatsie PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/singleapplication
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/widgets/elidedlabel
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/widgets/scrolltext
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/widgets/MoreApps
-    ${CMAKE_CURRENT_BINARY_DIR}
-)
-
-# Link libraries
-target_link_libraries(whatsie PRIVATE
-    Qt${QT_VERSION_MAJOR}::Core
-    Qt${QT_VERSION_MAJOR}::Gui
-    Qt${QT_VERSION_MAJOR}::Widgets
-    Qt${QT_VERSION_MAJOR}::WebEngineWidgets
-    Qt${QT_VERSION_MAJOR}::Positioning
-    Qt${QT_VERSION_MAJOR}::Network
-    notify-qt
-    X11
-)
-
-# Define compiler definitions
-target_compile_definitions(whatsie PRIVATE
-    QAPPLICATION_CLASS=QApplication
-    QT_DEPRECATED_WARNINGS
-    GIT_HASH="${GIT_HASH}"
-    GIT_BRANCH="${GIT_BRANCH}"
-    BUILD_TIMESTAMP="${BUILD_TIMESTAMP}"
-    VERSIONSTR="${PROJECT_VERSION}"
-)
-
-# Check for WebEngine spellchecker support
-# Note: This check is simplified; you may need to enhance it based on your build environment
-message(STATUS "Qt6 WebEngine spellchecker support: enabled (required)")
-
-# Install the executable
-install(TARGETS whatsie DESTINATION ${BINDIR})
-
-# Install desktop file
-install(FILES dist/linux/com.ktechpit.whatsie.desktop
-    DESTINATION ${DATADIR}/applications
-)
-
-# Install appdata file
-install(FILES dist/linux/com.ktechpit.whatsie.appdata.xml
-    DESTINATION ${DATADIR}/metainfo
-)
-
-# Install license
-install(FILES LICENSE
-    DESTINATION ${DATADIR}/licenses/whatsie
-)
-
-# Install icons
-install(FILES dist/linux/hicolor/16x16/apps/com.ktechpit.whatsie.png
-    DESTINATION ${DATADIR}/icons/hicolor/16x16/apps
-)
-install(FILES dist/linux/hicolor/32x32/apps/com.ktechpit.whatsie.png
-    DESTINATION ${DATADIR}/icons/hicolor/32x32/apps
-)
-install(FILES dist/linux/hicolor/64x64/apps/com.ktechpit.whatsie.png
-    DESTINATION ${DATADIR}/icons/hicolor/64x64/apps
-)
-install(FILES dist/linux/hicolor/128x128/apps/com.ktechpit.whatsie.png
-    DESTINATION ${DATADIR}/icons/hicolor/128x128/apps
-)
-install(FILES dist/linux/hicolor/256x256/apps/com.ktechpit.whatsie.png
-    DESTINATION ${DATADIR}/icons/hicolor/256x256/apps
-)
-install(FILES dist/linux/hicolor/scalable/apps/com.ktechpit.whatsie.svg
-    DESTINATION ${DATADIR}/icons/hicolor/scalable/apps
-)
-install(FILES dist/linux/hicolor/symbolic/apps/com.ktechpit.whatsie-symbolic.svg
-    DESTINATION ${DATADIR}/icons/hicolor/symbolic/apps
-)
-
-# Spell-check dictionaries are provided at runtime by the system hunspell
-# package (or the hunspell-dictionaries content snap in the snap build).
-# No compile-time dictionary conversion is needed.
-
-# Summary message
-message(STATUS "")
-message(STATUS "========== Whatsie Build Configuration ==========")
-message(STATUS "Version:                  ${PROJECT_VERSION}")
-message(STATUS "Install prefix:           ${CMAKE_INSTALL_PREFIX}")
-message(STATUS "Build type:               ${CMAKE_BUILD_TYPE}")
-message(STATUS "Git Hash:                 ${GIT_HASH}")
-message(STATUS "Git Branch:               ${GIT_BRANCH}")
-message(STATUS "Build Timestamp:          ${BUILD_TIMESTAMP}")
-message(STATUS "Flatpak Build:            ${FLATPAK_BUILD}")
-message(STATUS "================================================")
-message(STATUS "")
-
+if(WHATSIE_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()

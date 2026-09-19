@@ -1,3 +1,48 @@
+whatsie (6.1.0-1~ppa1~resolute1) resolute; urgency=medium
+
+  * Package Whatsie 6.1.0 for Ubuntu 26.04 LTS.
+  * Build against Ubuntu's native Qt 6.10.2 stack.
+  * Lower the upstream Linux Qt build floor from 6.11 to 6.10 for Resolute.
+  * Adopt the upstream 6.x Debian dependency model and application rewrite.
+
+ -- Reaper <JohnGrimmReaper@disroot.org>  Sat, 19 Sep 2026 03:03:00 +0000
+
+whatsie (6.1.0) unstable; urgency=medium
+
+  * Interface translations: German, Spanish, French, Italian, Portuguese
+    (Brazil) and Russian, selectable in Settings → General.
+  * Unread count now shown as a launcher/taskbar badge.
+  * Spell check can use multiple languages at once (Settings → Advanced).
+  * New Settings → Advanced option to render at the display's refresh rate.
+  * Tray: centre and size the monochrome glyph correctly.
+  * Wayland: match the snap-exported desktop id so the app groups correctly.
+
+ -- Keshav Bhatt <keshavnrj@gmail.com>  Wed, 09 Sep 2026 12:00:00 +0530
+
+whatsie (6.0.4) unstable; urgency=medium
+
+  * Spell check: fix dictionaries silently failing to load; allow adding
+    languages from Settings → Advanced.
+  * NVIDIA/Wayland: fall back to software rendering instead of a black screen.
+
+ -- Keshav Bhatt <keshavnrj@gmail.com>  Mon, 07 Sep 2026 12:00:00 +0530
+
+whatsie (6.0.3) unstable; urgency=medium
+
+  * Drag-and-drop: show a drop hint and report files that can't be attached
+    instead of failing silently.
+  * Tray tooltip now reads "Whatsie".
+  * Bug-report diagnostics include the CPU architecture.
+
+ -- Keshav Bhatt <keshavnrj@gmail.com>  Sat, 05 Sep 2026 12:00:00 +0530
+
+whatsie (6.0.1) unstable; urgency=medium
+
+  * Debian packaging for the Qt 6 rewrite.
+  * Fixes device linking (phone number and QR code).
+
+ -- Keshav Bhatt <keshavnrj@gmail.com>  Fri, 04 Sep 2026 18:57:00 +0530
+
 whatsie (5.1.0-1~ppa1~resolute1) resolute; urgency=medium
 
   * Package Whatsie 5.1.0 for Ubuntu 26.04 LTS.

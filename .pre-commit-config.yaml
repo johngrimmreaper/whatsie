@@ -1,5 +1,0 @@
-repos:
-  - repo: https://github.com/soerenschneider/conventional-pre-commit-hook
-    rev: v1.0.0
-    hooks:
-      - id: conventional-commit

@@ -1,0 +1,35 @@
+#pragma once
+
+#include <QImage>
+#include <QString>
+
+// Pure functions behind the tray/window unread badge (FEATURES T2).
+namespace whatsie::core {
+
+/// Parses WhatsApp Web's document title. "(3) WhatsApp" → 3, "WhatsApp" → 0,
+/// "(99+) WhatsApp" → 99. Anything unrecognised → 0.
+[[nodiscard]] int unreadCountFromTitle(const QString& title);
+
+/// Returns `base` with a red counter bubble in the bottom-right corner.
+/// `count <= 0` returns `base` unchanged. Counts above 99 render as "99+".
+[[nodiscard]] QImage composeUnreadBadge(const QImage& base, int count);
+
+/// Desaturates and fades `image` toward grey by `amount` in [0,1] — used to dim
+/// the tray icon while disconnected (FEATURES T6).
+[[nodiscard]] QImage dimImage(const QImage& image, qreal amount);
+
+/// Recolours `image` to `color`, keeping its alpha (silhouette) — turns the
+/// symbolic-icon glyph into a visible foreground for the tray (FEATURES T3).
+[[nodiscard]] QImage tintImage(const QImage& image, const QColor& color);
+
+/// Turns a glyph into a monochrome tray icon: a white fill with a thin dark
+/// halo, so it stays visible whatever the panel colour (FEATURES T3). The panel
+/// colour is not knowable and is independent of the app theme.
+[[nodiscard]] QImage monochromeIcon(const QImage& glyph);
+
+/// Trims the transparent margin around `glyph`, then centres it in a `size`×`size`
+/// square filling `fill` (0..1) of the box. A symbolic glyph with uneven internal
+/// padding otherwise renders small and off-centre next to other tray icons (#356).
+[[nodiscard]] QImage fitGlyphToIcon(const QImage& glyph, int size, qreal fill);
+
+} // namespace whatsie::core

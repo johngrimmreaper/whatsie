@@ -1,274 +1,284 @@
-#include <QApplication>
-#include <QDebug>
-#include <QtWidgets>
-#include <QtWebEngineCore>
+#include "app/application.h"
+#include "app/single_instance.h"
+#include "app/version.h"
+#include "core/graphics_fallback.h"
+#include "core/log_sink.h"
+#include "core/settings/settings.h"
+#include "core/settings/settings_keys.h"
+#include "platform/crash_handler.h"
+#include "platform/gpu_stderr_watch.h"
+#include "ui/main_window.h"
 
-#include "common.h"
-#include "def.h"
-#include "mainwindow.h"
-#include "settingsmanager.h"
-#include "webengineprofilemanager.h"
-#include <singleapplication.h>
+#include <QByteArray>
+#include <QCoreApplication>
+#include <QLibraryInfo>
+#include <QLocale>
+#include <QTranslator>
+#include <QDir>
+#include <QGuiApplication>
+#include <QProcess>
+#include <QSettings>
+#include <QStandardPaths>
+#include <QTimer>
 
-// Must run before QApplication is created so Qt WebEngine picks these up.
-static void setChromiumFlags() {
-  if (!qEnvironmentVariableIsEmpty("QTWEBENGINE_CHROMIUM_FLAGS"))
-    return;
-#ifdef QT_DEBUG
-  qputenv("QTWEBENGINE_CHROMIUM_FLAGS",
-    "--remote-debugging-port=9421 "
-          "--disable-gpu "
-          "--disable-gpu-compositing "
-          "--disable-translate "
-          "--disable-extensions "
-          "--disable-component-update "
-          "--disable-default-apps "
-          "--no-sandbox");
-#else
-  qputenv("QTWEBENGINE_CHROMIUM_FLAGS",
-          "--disable-gpu "
-          "--disable-gpu-compositing "
-          "--disable-translate "
-          "--disable-extensions "
-          "--disable-component-update "
-          "--disable-default-apps "
-          "--no-sandbox");
+#ifdef Q_OS_UNIX
+#include <QSocketNotifier>
+#include <csignal>
+#include <unistd.h>
 #endif
+
+#include <algorithm>
+#include <atomic>
+#include <cmath>
+
+namespace {
+
+// Interface scale (FEATURES A7) must reach Qt through QT_SCALE_FACTOR, which is
+// read once during QApplication construction — so we peek at the stored value
+// before the application object exists. This mirrors the default profile only;
+// a per-profile override would need the profile parsed here, which is not worth
+// the complexity for a global appearance preference.
+void applyInterfaceScaleEnv()
+{
+    if (qEnvironmentVariableIsSet("QT_SCALE_FACTOR")) {
+        return; // never override an explicit user/env value
+    }
+    const QSettings store(QString::fromLatin1(whatsie::app::version::kOrganizationName),
+                          QString::fromLatin1(whatsie::app::version::kApplicationName));
+    const double stored = store.value(whatsie::core::keys::kInterfaceScale, 1.0).toDouble();
+    const double scale = std::clamp(stored, whatsie::core::Settings::kMinInterfaceScale,
+                                    whatsie::core::Settings::kMaxInterfaceScale);
+    if (std::abs(scale - 1.0) > 0.001) {
+        qputenv("QT_SCALE_FACTOR", QByteArray::number(scale, 'g', 4));
+    }
 }
 
-int main(int argc, char *argv[]) {
-  // Qt6 on Linux routes qDebug/qWarning to journald when the process is not
-  // attached to a TTY (e.g. when launched from an IDE).  Force stderr output
-  // so the IDE Run console always captures debug logs.
-#ifdef QT_DEBUG
-  qputenv("QT_FORCE_STDERR_LOGGING", "1");
+// FEATURES S20: watch the log stream for a graphics-backend init failure so we
+// can fall back from a broken Wayland RHI to XCB, once.
+std::atomic<bool> g_graphicsFailed{false};
+// NVIDIA/Wayland renders the web view black via the GBM→Vulkan fallback while the
+// GPU process stays healthy, so no init failure or crash fires — fall back to
+// software rendering, which recovers it (XWayland can fail to start; issue #351).
+std::atomic<bool> g_gpuBlackScreen{false};
+QtMessageHandler g_previousHandler = nullptr;
+
+void graphicsWatchHandler(QtMsgType type, const QMessageLogContext& context, const QString& message)
+{
+    if (whatsie::core::isGraphicsInitFailure(message)) {
+        g_graphicsFailed.store(true);
+    }
+    if (whatsie::core::isGbmVulkanFallback(message)) {
+        g_gpuBlackScreen.store(true);
+    }
+    if (g_previousHandler != nullptr) {
+        g_previousHandler(type, context, message);
+    }
+}
+
+#ifdef Q_OS_UNIX
+// Self-pipe so SIGTERM/SIGINT (session logout, shutdown, Ctrl+C) become a
+// graceful QApplication quit instead of an abrupt death. Normal teardown then
+// runs — settings are synced and the GPU-probe marker is cleared — so an
+// ordinary shutdown within the ~20 s GPU trial window is not later miscounted
+// as a crash strike (which, twice, would wrongly force software rendering).
+int g_termPipe[2] = {-1, -1};
+
+void writeTermSignal(int /*signum*/)
+{
+    const char byte = 1;
+    const ssize_t ignored = ::write(g_termPipe[1], &byte, 1);
+    static_cast<void>(ignored); // async-signal-safe; nothing useful to do on error
+}
+
+int installGracefulTermination()
+{
+    if (::pipe(g_termPipe) != 0) {
+        return -1;
+    }
+    struct sigaction action{};
+    action.sa_handler = writeTermSignal;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = SA_RESTART;
+    sigaction(SIGTERM, &action, nullptr);
+    sigaction(SIGINT, &action, nullptr);
+    return g_termPipe[0];
+}
 #endif
 
-  setChromiumFlags();
+// Load the interface translation before any widget is built, so tr() strings
+// resolve to the chosen language (issue #171). An explicit choice wins; empty
+// follows the system locale. Only Whatsie's own UI is translated — the chat
+// content is WhatsApp Web's, chosen by WhatsApp from the account/browser.
+void installInterfaceTranslators(whatsie::app::Application& app)
+{
+    const QString chosen = app.settings().interfaceLanguage();
+    const QLocale locale = chosen.isEmpty() ? QLocale::system() : QLocale(chosen);
 
-  SingleApplication instance(argc, argv, true);
-  instance.setQuitOnLastWindowClosed(false);
-  instance.setWindowIcon(themeIcon("whatsie", ":/icons/app/icon-64.png"));
-  QApplication::setApplicationName("WhatSie");
-  QApplication::setDesktopFileName("com.ktechpit.whatsie");
-  QApplication::setOrganizationDomain("com.ktechpit");
-  QApplication::setOrganizationName("org.keshavnrj.ubuntu");
-  QApplication::setApplicationVersion(VERSIONSTR);
-
-
-  QCommandLineParser parser;
-  parser.setApplicationDescription(
-      QObject::tr("Feature rich WhatsApp web client based on Qt WebEngine"));
-
-  QList<QCommandLineOption> secondaryInstanceCLIOptions;
-
-  QCommandLineOption showCLIHelpOption(
-      QStringList() << "h"
-                    << "help",
-      QObject::tr("Displays help on commandline options"));
-
-  QCommandLineOption openSettingsOption(
-      QStringList() << "s"
-                    << "open-settings",
-      QObject::tr("Opens Settings dialog in a running instance of ") +
-          QApplication::applicationName());
-
-  QCommandLineOption lockAppOption(QStringList() << "l"
-                                                 << "lock-app",
-                                   QObject::tr("Locks a running instance of ") +
-                                       QApplication::applicationName());
-
-  QCommandLineOption openAboutOption(
-      QStringList() << "i"
-                    << "open-about",
-      QObject::tr("Opens About dialog in a running instance of ") +
-          QApplication::applicationName());
-
-  QCommandLineOption toggleThemeOption(
-      QStringList() << "t"
-                    << "toggle-theme",
-      QObject::tr(
-          "Toggle between dark & light theme in a running instance of ") +
-          QApplication::applicationName());
-
-  QCommandLineOption reloadAppOption(
-      QStringList() << "r"
-                    << "reload-app",
-      QObject::tr("Reload the app in a running instance of ") +
-          QApplication::applicationName());
-
-  QCommandLineOption newChatOption(
-      QStringList() << "n"
-                    << "new-chat",
-      QObject::tr("Open new chat prompt in a running instance of ") +
-          QApplication::applicationName());
-
-  QCommandLineOption buildInfoOption(QStringList() << "b"
-                                                   << "build-info",
-                                     "Shows detailed current build infomation");
-
-  QCommandLineOption showAppWindowOption(
-      QStringList() << "w"
-                    << "show-window",
-      QObject::tr("Show main window of running instance of ") +
-          QApplication::applicationName());
-
-  parser.addOption(showCLIHelpOption);
-  parser.addVersionOption();
-  parser.addOption(buildInfoOption);
-  parser.addOption(showAppWindowOption);
-  parser.addOption(openSettingsOption);
-  parser.addOption(lockAppOption);
-  parser.addOption(openAboutOption);
-  parser.addOption(toggleThemeOption);
-  parser.addOption(reloadAppOption);
-  parser.addOption(newChatOption);
-
-  secondaryInstanceCLIOptions << showAppWindowOption << openSettingsOption
-                              << lockAppOption << openAboutOption
-                              << toggleThemeOption << reloadAppOption
-                              << newChatOption;
-
-  parser.process(instance);
-
-  if (parser.isSet(showCLIHelpOption)) {
-    parser.showHelp();
-  }
-
-  if (parser.isSet(buildInfoOption)) {
-
-    qInfo().noquote()
-        << parser.applicationDescription() << "\n"
-        << QStringLiteral("version: %1, branch: %2, commit: %3, built_at: %4")
-               .arg(VERSIONSTR, GIT_BRANCH, GIT_HASH, BUILD_TIMESTAMP);
-    return 0;
-  }
-
-  // if secondary instance is invoked
-  if (instance.isSecondary()) {
-    instance.sendMessage(instance.arguments().join(' ').toUtf8());
-    qInfo().noquote() << QApplication::applicationName() +
-                             " is already running with PID: " +
-                             QString::number(instance.primaryPid()) +
-                             " by USER:"
-                      << instance.primaryUser();
-    return 0;
-  }
-
-  // Initialise the single persistent WebEngine profile before any page is created.
-  WebEngineProfileManager::instance();
-
-  MainWindow whatsie;
-
-  // else
-  QObject::connect(
-      &instance, &SingleApplication::receivedMessage, &whatsie,
-      [&whatsie, &secondaryInstanceCLIOptions](int instanceId,
-                                               QByteArray message) {
-        qInfo().noquote() << "Another instance with PID: " +
-                                 QString::number(instanceId) +
-                                 ", sent argument: " + message;
-        QString messageStr = QString::fromUtf8(message);
-
-        QCommandLineParser p;
-        p.addOptions(secondaryInstanceCLIOptions);
-        p.parse(QStringList(messageStr.split(" ")));
-
-        if (p.isSet("s")) {
-          qInfo() << "cmd:"
-                  << "OpenAppSettings";
-          whatsie.alreadyRunning();
-          whatsie.showSettings(true);
-          return;
-        }
-
-        if (p.isSet("l")) {
-          qInfo() << "cmd:"
-                  << "LockApp";
-          whatsie.alreadyRunning();
-          if (!SettingsManager::instance()
-                   .settings()
-                   .value("asdfg")
-                   .isValid()) {
-            whatsie.showNotification(
-                QApplication::applicationName(),
-                QObject::tr("App lock is not configured, \n"
-                            "Please setup the password in the Settings "
-                            "first."));
-          } else {
-            whatsie.lockApp();
-          }
-          return;
-        }
-
-        if (p.isSet("i")) {
-          qInfo() << "cmd:"
-                  << "OpenAppAbout";
-          whatsie.alreadyRunning();
-          whatsie.showAbout();
-          return;
-        }
-
-        if (p.isSet("t")) {
-          qInfo() << "cmd:"
-                  << "ToggleAppTheme";
-          whatsie.alreadyRunning();
-          whatsie.toggleTheme();
-          return;
-        }
-
-        if (p.isSet("r")) {
-          qInfo() << "cmd:"
-                  << "ReloadApp";
-          whatsie.alreadyRunning();
-          whatsie.doReload(false, true);
-          return;
-        }
-
-        if (p.isSet("n")) {
-          qInfo() << "cmd:"
-                  << "OpenNewChatPrompt";
-          whatsie.alreadyRunning();
-          whatsie.newChat(); // TODO: invetigate the crash
-          return;
-        }
-
-        if (p.isSet("w")) {
-          qInfo() << "cmd:"
-                  << "ShowAppWindow";
-          whatsie.alreadyRunning();
-          whatsie.show();
-          return;
-        }
-
-        if (messageStr.contains("whatsapp://", Qt::CaseInsensitive)) {
-          QString urlStr =
-              "whatsapp://" + messageStr.split("whatsapp://").last();
-          qInfo() << "cmd:"
-                  << "x-schema-handler";
-          whatsie.loadSchemaUrl(urlStr);
-        } else {
-          whatsie.alreadyRunning(true);
-        }
-      });
-
-  foreach (QString argStr, instance.arguments()) {
-    if (argStr.contains("whatsapp://")) {
-      qInfo() << "cmd:"
-              << "x-schema-handler";
-      whatsie.loadSchemaUrl(argStr);
+    // Qt's own strings first (standard dialog buttons, shortcuts).
+    auto* qtTranslator = new QTranslator(&app);
+    if (qtTranslator->load(locale, QStringLiteral("qtbase"), QStringLiteral("_"),
+                           QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
+        QCoreApplication::installTranslator(qtTranslator);
     }
-  }
+    // Then Whatsie's own, embedded by qt_add_translations at :/i18n/<name>.qm.
+    // Try the stored code verbatim (the .qm base name), then the locale's full
+    // name and bare language, so a persisted choice always resolves (#171).
+    auto* appTranslator = new QTranslator(&app);
+    QStringList candidates;
+    if (!chosen.isEmpty()) {
+        candidates << chosen;
+    }
+    candidates << locale.name() << locale.name().section(u'_', 0, 0);
+    for (const QString& candidate : candidates) {
+        if (appTranslator->load(QStringLiteral(":/i18n/%1.qm").arg(candidate))) {
+            QCoreApplication::installTranslator(appTranslator);
+            qInfo("interface language: %s", qUtf8Printable(candidate));
+            return;
+        }
+    }
+}
 
-  if (QSystemTrayIcon::isSystemTrayAvailable() &&
-      SettingsManager::instance()
-          .settings()
-          .value("startMinimized", false)
-          .toBool()) {
-    whatsie.runMinimized();
-  } else {
-    whatsie.show();
-  }
+void relaunchUnderXcb(whatsie::app::Application& app)
+{
+    qputenv("QT_QPA_PLATFORM", "xcb");
+    qputenv("WHATSIE_XCB_RETRY", "1");
+    const QStringList args = QCoreApplication::arguments().mid(1);
+    // Drop the single-instance lock first: otherwise the XCB child sees this
+    // still-listening process as the primary, forwards a "raise" command and
+    // exits as a secondary — leaving the app fully closed with no window.
+    app.singleInstance().release();
+    if (QProcess::startDetached(QCoreApplication::applicationFilePath(), args)) {
+        QCoreApplication::quit();
+    } else {
+        qWarning("xcb relaunch failed to start; staying on the current platform");
+    }
+}
 
-  return instance.exec();
+// A GPU context-loss storm (e.g. stopping a Wayland screen share) hangs the GPU
+// process. Persist the fall-back to software rendering — and a one-shot notice so
+// the user is told why — then relaunch onto the working configuration.
+void relaunchForGpuFallback(whatsie::app::Application& app)
+{
+    qWarning("GPU context-loss storm detected; disabling hardware acceleration and relaunching");
+    app.settings().setGpuAutoDisabled(true);
+    app.settings().setGpuFallbackNotice(true);
+    app.settings().sync(); // flush before the child starts
+    app.singleInstance().release();
+    const QStringList args = QCoreApplication::arguments().mid(1);
+    if (QProcess::startDetached(QCoreApplication::applicationFilePath(), args)) {
+        QCoreApplication::quit();
+    } else {
+        qWarning("GPU-fallback relaunch failed to start");
+    }
+}
+
+} // namespace
+
+int main(int argc, char* argv[])
+{
+    // Capture everything from the first line on; the file sink is attached
+    // once the application identity (and thus the log location) is known.
+    whatsie::core::LogSink::install();
+
+    // Both must run before the QApplication constructor reads them.
+    applyInterfaceScaleEnv();
+    QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
+
+    whatsie::app::Application app(argc, argv);
+    if (app.shouldExit()) {
+        return app.exitCode();
+    }
+
+#ifdef Q_OS_WIN
+    // Started from an autostart entry or a shell verb, the process can inherit
+    // C:\Windows\System32 as its working directory; QtWebEngine then resolves its
+    // Chromium DLLs against that path and aborts. Anchor the working directory to
+    // the executable, before the web engine initialises.
+    QDir::setCurrent(QCoreApplication::applicationDirPath());
+#endif
+
+    // Record fatal signals so the next run can offer the crash in a bug report,
+    // and pick up any report the previous run left behind.
+    whatsie::platform::installCrashHandler(
+        QStandardPaths::writableLocation(QStandardPaths::CacheLocation) +
+        QLatin1String("/last-crash.txt"));
+
+    // Chain onto the sink Application just installed, so a later graphics failure
+    // during window/WebEngine creation is observed (FEATURES S20).
+    g_previousHandler = qInstallMessageHandler(graphicsWatchHandler);
+
+    // Watch stderr for a GPU context-loss storm (the EGL_BAD_DISPLAY flood that
+    // hangs the app when a Wayland screen share is stopped) and self-heal onto
+    // software rendering. Installed before the web engine spawns its GPU
+    // subprocess so their inherited stderr is captured too.
+    auto* gpuWatch = new whatsie::platform::GpuStderrWatch(&app);
+    if (gpuWatch->install()) {
+        QObject::connect(gpuWatch, &whatsie::platform::GpuStderrWatch::gpuContextLostStorm, &app,
+                         [&app] { relaunchForGpuFallback(app); });
+    }
+
+    installInterfaceTranslators(app);
+
+    whatsie::ui::MainWindow window(app.settings(), app.themeService());
+    QObject::connect(&app, &whatsie::app::Application::raiseRequested, &window,
+                     &whatsie::ui::MainWindow::showAndRaise);
+    QObject::connect(&app, &whatsie::app::Application::newChatRequested, &window,
+                     &whatsie::ui::MainWindow::openChat);
+    QObject::connect(&app, &whatsie::app::Application::settingsRequested, &window,
+                     &whatsie::ui::MainWindow::showSettings);
+    QObject::connect(&app, &whatsie::app::Application::quitRequested, &window,
+                     &whatsie::ui::MainWindow::quit);
+
+    const whatsie::app::CliOptions& cli = app.cliOptions();
+    window.start(cli.startMinimized || app.settings().startMinimized());
+
+    // If the GPU is on trial (ADR-032), a clean 20 s means it is stable — clear
+    // the crash probe so the next start is not treated as a GPU crash.
+    QTimer::singleShot(20000, &app, [&app] { app.markGpuStable(); });
+
+    // Give the GPU/graphics stack time to fail, then self-heal (once).
+    if (QGuiApplication::platformName() == QLatin1StringView("wayland")) {
+        QTimer::singleShot(3000, &window, [&app] {
+            // A silent black web view on NVIDIA/Wayland (GBM unavailable → Vulkan
+            // fallback) is recovered by software rendering: switching to XWayland
+            // can fail to start there entirely (issue #351). Only under Automatic
+            // and only once — persisting the fallback stops it recurring.
+            if (g_gpuBlackScreen.load()
+                && app.settings().hardwareAcceleration() == whatsie::core::HardwareAcceleration::Auto
+                && !app.settings().gpuAutoDisabled()) {
+                relaunchForGpuFallback(app);
+                return;
+            }
+            // A hard graphics-backend init failure on Wayland is retried under XCB
+            // once (FEATURES S20).
+            const bool retried = qEnvironmentVariableIsSet("WHATSIE_XCB_RETRY");
+            if (whatsie::core::shouldRetryUnderXcb(QLatin1StringView("wayland"), retried,
+                                                   g_graphicsFailed.load())) {
+                relaunchUnderXcb(app);
+            }
+        });
+    }
+
+#ifdef Q_OS_UNIX
+    const int termFd = installGracefulTermination();
+    if (termFd >= 0) {
+        auto* termNotifier = new QSocketNotifier(termFd, QSocketNotifier::Read, &window);
+        QObject::connect(termNotifier, &QSocketNotifier::activated, &window, [&window] {
+            char byte = 0;
+            const ssize_t ignored = ::read(g_termPipe[0], &byte, 1);
+            static_cast<void>(ignored);
+            window.quit();
+        });
+    }
+#endif
+
+    // Commands given on our own command line (we are the primary instance).
+    for (const QJsonObject& command : whatsie::app::commandsFor(cli)) {
+        if (command.value(QLatin1StringView(whatsie::app::cmd::kKey)).toString() !=
+            QLatin1StringView(whatsie::app::cmd::kRaise)) {
+            app.dispatchCommand(command);
+        }
+    }
+
+    return whatsie::app::Application::exec();
 }

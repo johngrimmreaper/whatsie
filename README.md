@@ -1,147 +1,176 @@
-# WhatSie
+<p align="center">
+  <img src="screenshots/banner.png" alt="Whatsie — WhatsApp Web, in a real desktop app" width="100%">
+</p>
 
-Feature rich WhatsApp web client based on Qt WebEngine for Linux Desktop
+<h1 align="center">Whatsie</h1>
 
-## Whatsie Key features
+<p align="center">
+  <b>WhatsApp Web, in a real desktop app.</b><br>
+  Native notifications, a tray unread badge, calls and screen share, a real downloads
+  manager, themes that follow the page, spell check, a proxy, and an optional app lock —
+  lightweight and open source, built with Qt&nbsp;6.
+</p>
 
-- Light and Dark Themes with automatic switching
-- Customized Notifications & Native Notifications
-- Keyboard Shortcuts
-- BuiltIn download manager
-- Mute Audio, Disable Notifications
-- App Lock feature
-- Hardware access permission manager
-- Built in Spell Checker (with support for 31 Major languages)
-- Other settings that let you control every aspect of WebApp like:
-	+ Do not disturb mode
-	+ Full view mode, lets you expand the main view to the full width of the window
-	+ Ability to switch between Native & Custom notification
-	+ Configurable notification popup timeout
-	+ Mute all audio from Whatapp
-	+ Disabling auto playback of media
-	+ Minimize to tray on application start
-	+ Toggle to enable single click hide to the system tray
-	+ Switching download location
-	+ Enable disable app lock on application start
-	+ Auto-locking after a certain interval of time
-	+ App lock password management
-	+ Widget styling
-	+ Configurable auto Theme switching based on day night time
-	+ Configurable close button action
-	+ Global App shortcuts
-	+ Permission manager let you toggle camera mic and other hardware level permissions
-	+ Configurable page zoom factor, switching based on window state maximized on normal 
-	+ Configurable App User Agent
-	+ Application Storage management, lets you clean residual cache and persistent data
+<p align="center">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license">
+  <img src="https://img.shields.io/badge/Qt-6.11-41cd52?logo=qt&logoColor=white" alt="Qt 6.11">
+  <img src="https://img.shields.io/badge/C%2B%2B-20-00599c" alt="C++20">
+  <img src="https://img.shields.io/badge/platform-Linux-333" alt="Linux">
+</p>
 
-## Command line options:
-Comes with general CLI support, with a bunch of options that let you interact with already running instances of Whatsie.
+---
 
-Run: `whatsie -h` to see all supported options.
+## Why Whatsie
 
-```
-Usage: whatsie [options]
-Feature rich WhatsApp web client based on Qt WebEngine
+WhatsApp Web is great, but a browser tab is a poor home for it. Whatsie gives it a real
+window: it stays in your tray, tells you when a message arrives, opens your downloads where
+you expect them, and gets out of the way. It’s a thin, native shell — **no Electron** — so it
+starts fast and stays light.
 
-Options:
-  -h, --help           Displays help on commandline options
-  -v, --version        Displays version information.
-  -b, --build-info     Shows detailed current build infomation
-  -w, --show-window    Show main window of running instance of WhatSie
-  -s, --open-settings  Opens Settings dialog in a running instance of WhatSie
-  -l, --lock-app       Locks a running instance of WhatSie
-  -i, --open-about     Opens About dialog in a running instance of WhatSie
-  -t, --toggle-theme   Toggle between dark & light theme in a running instance
-                       of WhatSie
-  -r, --reload-app     Reload the app in a running instance of WhatSie
-  -n, --new-chat       Open new chat prompt in a running instance of WhatSie
-```
+## Screenshots
 
-## Build from Source (Linux)
+<p align="center">
+  <img src="screenshots/00-hero.png" alt="WhatsApp Web running in the Whatsie window" width="100%">
+</p>
 
-### Requirements
- - git, cmake >= 3.24, ninja-build
- - Qt6 >= 6.0 (qt6-base-dev, qt6-webengine-dev, qt6-positioning-dev)
- - C++17 compiler (GCC 7+, Clang 5+)
- - libx11-dev
+<table>
+  <tr>
+    <td width="50%"><img src="screenshots/01-lock.png" alt="Passcode lock screen"></td>
+    <td width="50%"><img src="screenshots/02-appearance.png" alt="Appearance settings"></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="screenshots/03-privacy.png" alt="Privacy and permission controls"></td>
+    <td width="50%"><img src="screenshots/04-bug-report.png" alt="One-click bug report"></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="screenshots/05-about.png" alt="About and diagnostics"></td>
+    <td width="50%"></td>
+  </tr>
+</table>
 
-### Install Dependencies
+## Features
 
-**Ubuntu/Debian:**
-```bash
-sudo apt-get install cmake ninja-build qt6-base-dev qt6-webengine-dev \
-    qt6-positioning-dev libx11-dev build-essential
-```
+**Desktop integration**
+- Native notifications with contact avatars.
+- System-tray icon with an unread badge, mute, and do-not-disturb.
+- Single instance with `--profile` for multiple accounts; autostart at login.
+- `whatsapp:` / `wa.me` links and a `--new-chat` command open straight into a chat.
 
-**Fedora:**
-```bash
-sudo dnf install cmake ninja-build qt6-qtbase-devel qt6-qtwebengine-devel \
-    qt6-qttools-devel libX11-devel gcc-c++
-```
+**The web experience, done right**
+- Light / dark / follow-system theming, kept in step with WhatsApp Web.
+- Voice, video and screen-share calls (Wayland via the desktop portal), with a reliable
+  full-screen exit hint.
+- A real downloads window with history; drag-and-drop and paste of attachments.
+- Zoom and interface scaling; optional smooth scrolling.
+- System-language spell check with suggestions.
 
-**Arch Linux:**
-```bash
-sudo pacman -S cmake ninja qt6-base qt6-webengine qt6-positioning
-```
+**Privacy & control**
+- Per-site camera, microphone and location controls.
+- Privacy blur to hide message text and media until you hover.
+- A passcode **app lock** (PBKDF2) that covers every window and can lock on start, on hide,
+  or after idle.
+- HTTP / SOCKS5 network proxy with authentication.
 
-### Build & Run
+**Honest about problems**
+- A built-in **Report a bug** flow that pre-fills a GitHub issue with diagnostics — and the
+  last crash, if there was one — while keeping your messages private.
 
-```bash
-git clone https://github.com/keshavbhatt/whatsie.git
-cd whatsie
-make build-release
-./build/whatsie
-```
+## Install
 
-### Install (Optional)
+### Linux
 
-```bash
-# Install to /usr/local
-make install
+<p align="center">
+  <a href="https://snapcraft.io/whatsie"><img alt="Get it from the Snap Store" height="56" src="https://snapcraft.io/static/images/badges/en/snap-store-black.svg"></a>
+  &nbsp;&nbsp;
+  <a href="https://flathub.org/apps/com.ktechpit.whatsie"><img alt="Get it on Flathub" height="52" src="https://dl.flathub.org/assets/badges/flathub-badge-en.svg"></a>
+</p>
 
-# OR install system-wide to /usr
-sudo make install INSTALL_PREFIX=/usr
+```sh
+# Snap — any distro with snapd
+sudo snap install whatsie
+
+# Flatpak — from Flathub
+flatpak install flathub com.ktechpit.whatsie
+
+# Arch Linux (AUR) — builds from source
+yay -S whatsie      # or: paru -S whatsie
 ```
 
-### Common Build Commands
+**AppImage** and a self-contained **`.deb`** (Qt bundled, installs on any modern
+Debian/Ubuntu) are attached to the [latest release](https://github.com/keshavbhatt/whatsie/releases/latest).
+Make the AppImage executable and run it (`chmod +x whatsie-*.AppImage`); install the deb with
+`sudo apt install ./whatsie_*_amd64.deb`.
 
-```bash
-make build-release    # Build in Release mode
-make build-debug      # Build in Debug mode
-make install          # Install to /usr/local
-make run              # Run the built executable
-make clean            # Clean build artifacts
-make help             # Show all available targets
+### Windows (x64)
+
+Download the installer or portable build from the
+[latest release](https://github.com/keshavbhatt/whatsie/releases/latest):
+
+- **`whatsie-<version>-x64.msi`** — installer (Start Menu + Desktop shortcuts, in-place upgrades)
+- **`whatsie-<version>-windows-x64.zip`** — portable, no install required
+
+Windows 10/11, 64-bit; it bundles its own Qt runtime.
+
+## Spell check
+
+Whatsie bundles dictionaries for several languages (English, German, Spanish,
+French, Italian, Russian). Turn it on and pick a language in **Settings →
+Advanced → Spell check**.
+
+To add a language that isn't bundled, drop its Chromium `<code>.bdic` file into
+the dictionaries folder — the **Open folder…** button in that same settings
+section takes you straight there (then reopen the dialog to pick the language):
+
+- **Snap:** `~/snap/whatsie/current/.local/share/ktechpit/whatsie/qtwebengine_dictionaries/`
+- **Flatpak:** `~/.var/app/com.ktechpit.whatsie/data/ktechpit/whatsie/qtwebengine_dictionaries/`
+- **Other:** `~/.local/share/ktechpit/whatsie/qtwebengine_dictionaries/`
+
+`.bdic` is Chromium's compiled dictionary format. Convert a Hunspell `.dic`/`.aff`
+pair with the `qwebengine_convert_dict` tool that ships with Qt WebEngine, e.g.
+`qwebengine_convert_dict fr_FR.dic fr-FR.bdic`.
+
+## Build from source
+
+Requires Qt **6.11** (the version shipped by the snap `kf6-core24` runtime and the Flathub
+KDE runtime), CMake ≥ 3.21, and a C++20 compiler.
+
+```sh
+# Development build against the KDE Qt 6.11 snap SDK (works on any distro)
+sudo snap install kde-qt6-core24-sdk kf6-core24
+scripts/dev-build.sh --tests    # configure + build + run the test suite
+scripts/dev-run.sh              # launch
+
+# …or with a system Qt >= 6.11
+cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake --build build -j
+ctest --test-dir build --output-on-failure
 ```
 
-### Troubleshooting
+Packagers can bundle only selected spell-check dictionaries with, e.g.,
+`-DWHATSIE_DICTIONARIES="en-US;de-DE"` (empty — the default — bundles every
+Hunspell dictionary found in `-DWHATSIE_HUNSPELL_DIR`, `/usr/share/hunspell`).
 
-| Problem | Solution |
-|---------|----------|
-| CMake not found | `sudo apt install cmake` |
-| Qt6 not found | `sudo apt install qt6-base-dev qt6-webengine-dev` |
-| Ninja not found | `sudo apt install ninja-build` |
-| Permission denied | `make install INSTALL_PREFIX=~/.local` |
+## Project layout
 
-For detailed build instructions, see `BUILD_QUICK_REFERENCE.md`
+```
+src/core      pure logic (settings, services) — Qt Core only, unit-tested
+src/web       WebEngine profile/page/view, injected scripts, the JS↔C++ bridge
+src/platform  OS backends behind interfaces (notifications, autostart, files, …)
+src/ui        QtWidgets: main window, dialogs, tray, lock screen
+src/app       Application object, CLI, single instance
+tests/        Qt Test suites (unit + offscreen smoke)
+snap/         snap packaging (built in CI)
+```
 
+## Contributing
 
+Found a bug? The fastest path is **Menu → About → Report a bug…**, which opens a pre-filled
+issue with the diagnostics already attached. Otherwise, open an issue or a pull request —
+the test suite runs with `scripts/dev-build.sh --tests`.
 
-## Install Whatsie on Linux Desktop
+## License
 
-### On any snapd supported Linux distributions
+[MIT](LICENSE) © Keshav Bhatt
 
- `snap install whatsie`
-
-### On any Arch based Linux distribution
-Using Arch User Repository (AUR), [AUR package for Whatsie](https://aur.archlinux.org/packages/whatsie-git) is maintained by [M0Rf30](https://github.com/M0Rf30)
-
- `yay -S whatsie-git`
-
-## Screenshots (could be old)
-
-![WhatSie for Linux Desktop Light Theme](https://github.com/keshavbhatt/whatsie/blob/main/screenshots/1.jpg?raw=true)
-![WhatSie for Linux Desktop Dark Theme](https://github.com/keshavbhatt/whatsie/blob/main/screenshots/2.jpg?raw=true)
-![WhatSie for Linux Desktop Setting module](https://github.com/keshavbhatt/whatsie/blob/main/screenshots/4.jpg?raw=true)
-![WhatSie for Linux Desktop App Lock screen](https://github.com/keshavbhatt/whatsie/blob/main/screenshots/3.jpg?raw=true)
-![WhatSie for Linux Desktop Shortcuts & Permissions](https://github.com/keshavbhatt/whatsie/blob/main/screenshots/5.jpg?raw=true)
+<sub>WhatsApp is a trademark of WhatsApp LLC. Whatsie is an independent client and is not
+affiliated with, endorsed by, or sponsored by WhatsApp or Meta.</sub>

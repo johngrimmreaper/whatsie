@@ -1,43 +1,24 @@
 [Desktop Entry]
-Name=WhatSie
-GenericName[it]=Client Qt per WhatsApp Web
-GenericName=Qt WhatsApp Web Client
-Comment[it]=Un Client per WhatsApp Web basato su Qt
-Comment=A WhatsApp Web Client using the Qt framework
+Name=Whatsie
+GenericName=WhatsApp Web Client
+Comment=A WhatsApp Web client built with Qt WebEngine
 Icon=com.ktechpit.whatsie
 Exec=whatsie %u
 Terminal=false
 Type=Application
-Categories=Chat;Network;InstantMessaging;Qt;
-Keywords=WhatSie;WhatsApp;
+Categories=Network;InstantMessaging;Chat;Qt;
+Keywords=Whatsie;WhatsApp;Chat;Messaging;
 StartupWMClass=whatsie
 StartupNotify=true
 MimeType=x-scheme-handler/whatsapp;
 X-GNOME-UsesNotifications=true
 
-Actions=Chat;Settings;Theme;Lock;About;
+Actions=NewChat;Settings;
 
-[Desktop Action Chat]
-Name[it]=Nuova Chat
-Name=New Chat
-Exec=whatsie -n
-
-[Desktop Action Theme]
-Name[it]=Cambia tema
-Name=Toggle theme
-Exec=whatsie -t
+[Desktop Action NewChat]
+Name=New chat
+Exec=whatsie --new-chat
 
 [Desktop Action Settings]
-Name[it]=Impostazioni
 Name=Settings
-Exec=whatsie -s
-
-[Desktop Action Lock]
-Name[it]=Blocca
-Name=Lock
-Exec=whatsie -l
-
-[Desktop Action About]
-Name[it]=Info
-Name=About
-Exec=whatsie -i
+Exec=whatsie --settings

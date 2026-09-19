@@ -1,0 +1,50 @@
+# Build the snap in GitHub's CI. Each architecture is
+# built on its native runner; on push (main) the .snap is uploaded as
+# an artifact, and with the repo variable PUBLISH_TO_STORE=true plus the
+# SNAPCRAFT_STORE_CREDENTIALS secret it is also released to the edge channel.
+name: snap
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - 'dist/**'
+      - 'snap/**'
+      - '.github/workflows/snap.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # snapcore/action-build / -publish have no Node 24 major yet, so they still
+      # emit a Node 20 deprecation warning — harmless, and out of our hands until
+      # Canonical ships a new major.
+      - name: Build snap (${{ matrix.arch }})
+        uses: snapcore/action-build@v1
+        id: build
+
+      - name: Publish to the Snap Store (edge)
+        if: >-
+          vars.PUBLISH_TO_STORE == 'true' &&
+          github.ref == 'refs/heads/main' &&
+          github.event_name == 'push'
+        uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        with:
+          snap: ${{ steps.build.outputs.snap }}
+          release: edge

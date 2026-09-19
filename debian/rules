@@ -1,10 +1,11 @@
 #!/usr/bin/make -f
+# Build Whatsie with debhelper's CMake buildsystem.
+# Ubuntu 26.04 ships Qt 6.10.2; upstream Linux packaging defaults to Qt 6.11.
 
 %:
-	dh $@ --buildsystem=cmake+ninja
+	dh $@ --buildsystem=cmake
 
-override_dh_auto_test:
-	@echo "No upstream test suite; skipping dh_auto_test"
-
-execute_after_dh_auto_install:
-	rm -rf debian/whatsie/usr/share/licenses
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-DWHATSIE_BUILD_TESTS=OFF \
+		-DWHATSIE_QT_MIN_VERSION=6.10
